@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Zoom Redirect</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!--
+    NO-JS FALLBACK: If JavaScript is disabled, uncomment the line below and
+    replace the URL with your Zoom meeting link. This is the only code change
+    needed when JS is unavailable.
+
+    <meta http-equiv="refresh" content="1; url=https://zoom.us/j/REPLACE_WITH_YOUR_ZOOM_ID">
+  -->
+
+  <style>
+    /* CSS Variables & Theme Setup */
+    :root {
+      --bg-color: #0a0a0a;
+      --card-bg: rgba(20, 20, 20, 0.6);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-primary: #f5f5f5;
+      --text-secondary: #a3a3a3;
+      --text-muted: #737373;
+      --accent-color: #ffffff;
+      --accent-hover: #e5e5e5;
+      --error-color: #f87171;
+      --error-bg: rgba(248, 113, 113, 0.1);
+      --error-border: rgba(248, 113, 113, 0.2);
+      --input-bg: #121212;
+      --input-border: #262626;
+      --input-focus: #525252;
+      --font-stack: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Reset & Base Styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      background-image: radial-gradient(circle at center, #141414 0%, #0a0a0a 100%);
+      color: var(--text-primary);
+      font-family: var(--font-stack);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Common View Layout */
+    .view-container {
+      position: relative;
+      width: 100%;
+      max-width: 460px;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .view {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .view.active {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Redirect Screen */
+    .redirect-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(255, 255, 255, 0.05);
+      border-top-color: var(--accent-color);
+      border-radius: 50%;
+      animation: spin 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+    }
+
+    .redirect-title {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .redirect-subtitle {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      max-width: 280px;
+      line-height: 1.4;
+    }
+
+    /* Setup Screen Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      text-align: left;
+    }
+
+    .card-header {
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .icon-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: var(--text-primary);
+    }
+
+    .card-title {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .card-description {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    /* Setup Form Components */
+    .form-group {
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      background-color: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.95rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
+    }
+
+    .input-field::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Error Message Box */
+    .error-container {
+      display: none;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      color: var(--error-color);
+      font-size: 0.825rem;
+      line-height: 1.4;
+      animation: fadeIn 0.2s ease forwards;
+    }
+
+    .error-container.visible {
+      display: flex;
+    }
+
+    .error-icon {
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Button */
+    .btn-submit {
+      width: 100%;
+      padding: 0.85rem;
+      background-color: var(--accent-color);
+      color: var(--bg-color);
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .btn-submit:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-submit:active {
+      transform: scale(0.985);
+    }
+
+    /* Info Hint Footer */
+    .card-footer-info {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* Subtle Edit Destination Button (Bottom Right) */
+    .edit-btn {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.9rem;
+      border-radius: 8px;
+      transition: color 0.2s, background-color 0.2s, transform 0.1s;
+      z-index: 10;
+    }
+
+    .edit-btn:hover {
+      color: var(--text-primary);
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .edit-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Animations */
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+
+  <!--
+    HEAD SCRIPT: Runs synchronously before paint to inject the meta-refresh
+    tag dynamically. This avoids the race condition where a static meta-refresh
+    fires before JS can intercept it.
+  -->
+  <script>
+    (function() {
+      var forceSetup = window.location.search.indexOf('setup') !== -1 ||
+                       window.location.hash === '#setup';
+
+      if (!forceSetup) {
+        try {
+          var storedTarget = localStorage.getItem('redirect_target');
+          if (storedTarget) {
+            var parsed = new URL(storedTarget);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+              // Safely inject meta-refresh only when a valid URL is confirmed
+              var meta = document.createElement('meta');
+              meta.setAttribute('http-equiv', 'refresh');
+              meta.setAttribute('content', '1; url=' + parsed.href);
+              document.head.appendChild(meta);
+            }
+          }
+        } catch (e) {
+          // localStorage unavailable or URL invalid — no meta tag injected
+        }
+      }
+    })();
+  </script>
+</head>
+<body>
+
+  <div class="view-container">
+    
+    <!-- View 1: Redirecting State -->
+    <div id="redirect-view" class="view">
+      <div class="redirect-content">
+        <div class="spinner"></div>
+        <h1 class="redirect-title">Redirecting to Zoom...</h1>
+        <p class="redirect-subtitle">Please wait while we connect you to your meeting.</p>
+      </div>
+    </div>
+
+    <!-- View 2: Setup/Config State -->
+    <div id="setup-view" class="view">
+      <div class="card">
+        <div class="card-header">
+          <div class="icon-wrapper">
+            <!-- Dynamic link/chain icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          </div>
+          <h1 class="card-title">Configure Destination</h1>
+          <p class="card-description">Set a destination Zoom URL. Any scans of the static QR code will automatically redirect here.</p>
+        </div>
+
+        <form id="setup-form" onsubmit="handleFormSubmit(event)">
+          <div class="form-group">
+            <label for="url-input" class="form-label">Zoom Meeting URL</label>
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                id="url-input" 
+                class="input-field" 
+                placeholder="https://zoom.us/j/1234567890" 
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+          </div>
+
+          <!-- Error Alert Banner -->
+          <div id="error-banner" class="error-container">
+            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span id="error-message">Please enter a valid URL.</span>
+          </div>
+
+          <button type="submit" class="btn-submit">Save & Redirect</button>
+        </form>
+
+        <p class="card-footer-info">
+          This URL is saved securely in your local browser cache. You can click the "Change destination" button in the bottom-right corner at any time to update this link.
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Subtle Edit Button -->
+  <button id="edit-destination-btn" class="edit-btn" onclick="triggerEditMode()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+    Change Destination
+  </button>
+
+  <script>
+    // Constants & Global State
+    const REDIRECT_DELAY_MS = 1000;
+    const STORAGE_KEY = 'redirect_target';
+    
+    let redirectTimer = null;
+
+    // DOM Elements
+    const redirectView = document.getElementById('redirect-view');
+    const setupView = document.getElementById('setup-view');
+    const editBtn = document.getElementById('edit-destination-btn');
+    const urlInput = document.getElementById('url-input');
+    const errorBanner = document.getElementById('error-banner');
+    const errorMessage = document.getElementById('error-message');
+
+    /**
+     * Switch view states with standard smooth fade transitions
+     */
+    function switchView(fromView, toView) {
+      // If we are showing setup view, hide edit button, otherwise show it
+      if (toView === setupView) {
+        editBtn.style.display = 'none';
+      } else {
+        editBtn.style.display = 'flex';
+      }
+
+      // If transition from existing view
+      if (fromView && fromView.classList.contains('active')) {
+        fromView.style.opacity = '0';
+        fromView.style.transform = 'translateY(-8px)';
+        
+        setTimeout(() => {
+          fromView.classList.remove('active');
+          activateView(toView);
+        }, 250);
+      } else {
+        activateView(toView);
+      }
+    }
+
+    function activateView(view) {
+      view.classList.add('active');
+      // Trigger browser style evaluation/reflow before opacity change
+      view.offsetHeight;
+      view.style.opacity = '1';
+      view.style.transform = 'translateY(0)';
+    }
+
+    /**
+     * Parse, validate, and sanitize a given URL
+     */
+    function validateAndSanitizeUrl(input) {
+      const trimmed = input.trim();
+      
+      if (!trimmed) {
+        return { isValid: false, error: 'Please enter a URL destination.' };
+      }
+
+      if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+        return { isValid: false, error: 'URL must start with http:// or https://' };
+      }
+
+      try {
+        const parsed = new URL(trimmed);
+        
+        if (!parsed.hostname) {
+          return { isValid: false, error: 'URL must contain a valid hostname.' };
+        }
+
+        // Return standardized and sanitized URL representation
+        return { isValid: true, url: parsed.href };
+      } catch (e) {
+        return { isValid: false, error: 'Please enter a valid URL structure.' };
+      }
+    }
+
+    /**
+     * Show validation error alert
+     */
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorBanner.classList.add('visible');
+      urlInput.style.borderColor = 'var(--error-color)';
+      urlInput.focus();
+    }
+
+    /**
+     * Hide validation error alert
+     */
+    function hideError() {
+      errorBanner.classList.remove('visible');
+      urlInput.style.borderColor = 'var(--input-border)';
+    }
+
+    /**
+     * Initiate the JS-based timeout redirect
+     */
+    function startRedirectTimer(destinationUrl) {
+      if (redirectTimer) {
+        clearTimeout(redirectTimer);
+      }
+      
+      redirectTimer = setTimeout(() => {
+        window.location.replace(destinationUrl);
+      }, REDIRECT_DELAY_MS);
+    }
+
+    /**
+     * Handle configuration form submission
+     */
+    function handleFormSubmit(event) {
+      event.preventDefault();
+      hideError();
+
+      const validation = validateAndSanitizeUrl(urlInput.value);
+
+      if (!validation.isValid) {
+        showError(validation.error);
+        return;
+      }
+
+      // Store destination securely in localStorage
+      localStorage.setItem(STORAGE_KEY, validation.url);
+
+      // Switch to redirect view and trigger redirect
+      switchView(setupView, redirectView);
+      startRedirectTimer(validation.url);
+    }
+
+    /**
+     * Trigger manual configuration mode (via Change Destination button)
+     */
+    function triggerEditMode() {
+      // Cancel active redirection timers
+      if (redirectTimer) {
+        clearTimeout(redirectTimer);
+        redirectTimer = null;
+      }
+
+      // Pre-fill form input with current destination if it exists
+      const currentTarget = localStorage.getItem(STORAGE_KEY);
+      if (currentTarget) {
+        urlInput.value = currentTarget;
+      } else {
+        urlInput.value = '';
+      }
+
+      hideError();
+      switchView(redirectView, setupView);
+    }
+
+    /**
+     * Initialize app state on load
+     */
+    window.addEventListener('DOMContentLoaded', () => {
+      const forceSetup = window.location.search.includes('setup') || window.location.hash === '#setup';
+      const storedTarget = localStorage.getItem(STORAGE_KEY);
+
+      if (forceSetup || !storedTarget) {
+        // If query/hash forces setup or no URL stored, open configuration directly
+        urlInput.value = storedTarget || '';
+        switchView(null, setupView);
+      } else {
+        // Stored URL exists: validate it before automatic redirection
+        const validation = validateAndSanitizeUrl(storedTarget);
+        
+        if (validation.isValid) {
+          switchView(null, redirectView);
+          startRedirectTimer(validation.url);
+        } else {
+          // Stored URL was corrupted or invalid: route to setup
+          localStorage.removeItem(STORAGE_KEY);
+          urlInput.value = '';
+          showError('Previous destination was invalid. Please reconfigure.');
+          switchView(null, setupView);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
